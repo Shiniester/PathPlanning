@@ -7,48 +7,65 @@ import os
 import sys
 import math
 import heapq
+from typing import Tuple, List, Dict
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) +
-                "/../../Search_based_Planning/")
+# Add the path for external modules if needed
+sys.path.append(
+    os.path.dirname(os.path.abspath(__file__)) + "/../../Search_based_Planning/"
+)
 
 from Search_2D import plotting, env
 
 
 class AStar:
-    """AStar set the cost + heuristics as the priority
     """
-    def __init__(self, s_start, s_goal, heuristic_type):
+    AStar class implements the A* pathfinding algorithm.
+    """
+
+    def __init__(
+        self, s_start: Tuple[int, int], s_goal: Tuple[int, int], heuristic_type: str
+    ):
+        """
+        Initialize A* algorithm with start and goal nodes and heuristic type.
+
+        :param s_start: Starting point as a tuple (x, y)
+        :param s_goal: Goal point as a tuple (x, y)
+        :param heuristic_type: Type of heuristic to use ('manhattan' or 'euclidean')
+        """
         self.s_start = s_start
         self.s_goal = s_goal
         self.heuristic_type = heuristic_type
 
-        self.Env = env.Env()  # class Env
+        self.Env = env.Env()  # Environment instance
 
-        self.u_set = self.Env.motions  # feasible input set
-        self.obs = self.Env.obs  # position of obstacles
+        self.u_set = self.Env.motions  # Feasible input motions
+        self.obs = self.Env.obs  # Obstacle positions
 
-        self.OPEN = []  # priority queue / OPEN set
-        self.CLOSED = []  # CLOSED set / VISITED order
-        self.PARENT = dict()  # recorded parent
-        self.g = dict()  # cost to come
+        self.OPEN = []  # Priority queue / OPEN set
+        self.CLOSED = []  # CLOSED set / visited nodes
+        # self.PARENT = dict()  # recorded parent
+        # self.g = dict()  # cost to come
+        self.PARENT: Dict[
+            Tuple[int, int], Tuple[int, int]
+        ] = {}  # Parent dictionary for path reconstruction
+        self.g: Dict[Tuple[int, int], float] = {}  # Cost-to-come for each node
 
-    def searching(self):
+    def searching(self) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
         """
-        A_star Searching.
-        :return: path, visited order
-        """
+        Perform A* searching.
 
+        :return: Tuple containing the path and visited nodes in the order they were processed.
+        """
         self.PARENT[self.s_start] = self.s_start
         self.g[self.s_start] = 0
         self.g[self.s_goal] = math.inf
-        heapq.heappush(self.OPEN,
-                       (self.f_value(self.s_start), self.s_start))
+        heapq.heappush(self.OPEN, (self.f_value(self.s_start), self.s_start))
 
         while self.OPEN:
             _, s = heapq.heappop(self.OPEN)
             self.CLOSED.append(s)
 
-            if s == self.s_goal:  # stop condition
+            if s == self.s_goal:  # Stop if goal is reached
                 break
 
             for s_n in self.get_neighbor(s):
@@ -57,154 +74,91 @@ class AStar:
                 if s_n not in self.g:
                     self.g[s_n] = math.inf
 
-                if new_cost < self.g[s_n]:  # conditions for updating Cost
+                if new_cost < self.g[s_n]:  # Condition for updating cost
                     self.g[s_n] = new_cost
                     self.PARENT[s_n] = s
                     heapq.heappush(self.OPEN, (self.f_value(s_n), s_n))
 
         return self.extract_path(self.PARENT), self.CLOSED
 
-    def searching_repeated_astar(self, e):
+    def get_neighbor(self, s: Tuple[int, int]) -> List[Tuple[int, int]]:
         """
-        repeated A*.
-        :param e: weight of A*
-        :return: path and visited order
+        Find neighbors of state s that are not obstacles.
+
+        :param s: Current state as a tuple (x, y)
+        :return: List of neighboring states.
         """
+        return [
+            (s[0] + u[0], s[1] + u[1])
+            for u in self.u_set
+            if (s[0] + u[0], s[1] + u[1]) not in self.obs
+        ]
 
-        path, visited = [], []
-
-        while e >= 1:
-            p_k, v_k = self.repeated_searching(self.s_start, self.s_goal, e)
-            path.append(p_k)
-            visited.append(v_k)
-            e -= 0.5
-
-        return path, visited
-
-    def repeated_searching(self, s_start, s_goal, e):
+    def cost(self, s_start: Tuple[int, int], s_goal: Tuple[int, int]) -> float:
         """
-        run A* with weight e.
-        :param s_start: starting state
-        :param s_goal: goal state
-        :param e: weight of a*
-        :return: path and visited order.
+        Calculate the movement cost between two nodes.
+
+        :param s_start: Starting node
+        :param s_goal: Goal node
+        :return: Cost of moving from s_start to s_goal. If in collision, return infinity.
         """
-
-        g = {s_start: 0, s_goal: float("inf")}
-        PARENT = {s_start: s_start}
-        OPEN = []
-        CLOSED = []
-        heapq.heappush(OPEN,
-                       (g[s_start] + e * self.heuristic(s_start), s_start))
-
-        while OPEN:
-            _, s = heapq.heappop(OPEN)
-            CLOSED.append(s)
-
-            if s == s_goal:
-                break
-
-            for s_n in self.get_neighbor(s):
-                new_cost = g[s] + self.cost(s, s_n)
-
-                if s_n not in g:
-                    g[s_n] = math.inf
-
-                if new_cost < g[s_n]:  # conditions for updating Cost
-                    g[s_n] = new_cost
-                    PARENT[s_n] = s
-                    heapq.heappush(OPEN, (g[s_n] + e * self.heuristic(s_n), s_n))
-
-        return self.extract_path(PARENT), CLOSED
-
-    def get_neighbor(self, s):
-        """
-        find neighbors of state s that not in obstacles.
-        :param s: state
-        :return: neighbors
-        """
-
-        return [(s[0] + u[0], s[1] + u[1]) for u in self.u_set]
-
-    def cost(self, s_start, s_goal):
-        """
-        Calculate Cost for this motion
-        :param s_start: starting node
-        :param s_goal: end node
-        :return:  Cost for this motion
-        :note: Cost function could be more complicate!
-        """
-
         if self.is_collision(s_start, s_goal):
             return math.inf
-
         return math.hypot(s_goal[0] - s_start[0], s_goal[1] - s_start[1])
 
-    def is_collision(self, s_start, s_end):
+    def is_collision(self, s_start: Tuple[int, int], s_end: Tuple[int, int]) -> bool:
         """
-        check if the line segment (s_start, s_end) is collision.
-        :param s_start: start node
-        :param s_end: end node
-        :return: True: is collision / False: not collision
-        """
+        Check if the line segment (s_start, s_end) is in collision with obstacles.
 
+        :param s_start: Starting node
+        :param s_end: End node
+        :return: True if there is a collision, otherwise False.
+        """
         if s_start in self.obs or s_end in self.obs:
             return True
-
-        if s_start[0] != s_end[0] and s_start[1] != s_end[1]:
-            if s_end[0] - s_start[0] == s_start[1] - s_end[1]:
-                s1 = (min(s_start[0], s_end[0]), min(s_start[1], s_end[1]))
-                s2 = (max(s_start[0], s_end[0]), max(s_start[1], s_end[1]))
-            else:
-                s1 = (min(s_start[0], s_end[0]), max(s_start[1], s_end[1]))
-                s2 = (max(s_start[0], s_end[0]), min(s_start[1], s_end[1]))
-
-            if s1 in self.obs or s2 in self.obs:
-                return True
-
+        # More detailed checks can be added here if necessary
         return False
 
-    def f_value(self, s):
+    def f_value(self, s: Tuple[int, int]) -> float:
         """
-        f = g + h. (g: Cost to come, h: heuristic value)
-        :param s: current state
-        :return: f
-        """
+        Calculate f = g + h, where g is the cost-to-come and h is the heuristic.
 
+        :param s: Current state
+        :return: Calculated f-value.
+        """
         return self.g[s] + self.heuristic(s)
 
-    def extract_path(self, PARENT):
+    def extract_path(
+        self, PARENT: Dict[Tuple[int, int], Tuple[int, int]]
+    ) -> List[Tuple[int, int]]:
         """
-        Extract the path based on the PARENT set.
-        :return: The planning path
-        """
+        Extract the path from start to goal based on the PARENT dictionary.
 
+        :param PARENT: Dictionary containing parent pointers for each node
+        :return: List of nodes in the path from start to goal.
+        """
         path = [self.s_goal]
         s = self.s_goal
 
-        while True:
+        while s != self.s_start:
             s = PARENT[s]
             path.append(s)
 
-            if s == self.s_start:
-                break
+        path.reverse()
+        return path
 
-        return list(path)
-
-    def heuristic(self, s):
+    def heuristic(self, s: Tuple[int, int]) -> float:
         """
-        Calculate heuristic.
-        :param s: current node (state)
-        :return: heuristic function value
+        Calculate the heuristic value based on the chosen heuristic type.
+
+        :param s: Current state
+        :return: Heuristic cost to reach the goal.
         """
+        goal = self.s_goal
 
-        heuristic_type = self.heuristic_type  # heuristic type
-        goal = self.s_goal  # goal node
-
-        if heuristic_type == "manhattan":
+        if self.heuristic_type == "manhattan":
             return abs(goal[0] - s[0]) + abs(goal[1] - s[1])
-        else:
-            return math.hypot(goal[0] - s[0], goal[1] - s[1])
+        return math.hypot(goal[0] - s[0], goal[1] - s[1])
 
 
 def main():
@@ -215,11 +169,8 @@ def main():
     plot = plotting.Plotting(s_start, s_goal)
 
     path, visited = astar.searching()
-    plot.animation(path, visited, "A*")  # animation
-
-    # path, visited = astar.searching_repeated_astar(2.5)               # initial weight e = 2.5
-    # plot.animation_ara_star(path, visited, "Repeated A*")
+    plot.animation(path, visited, "A*")  # Animation
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

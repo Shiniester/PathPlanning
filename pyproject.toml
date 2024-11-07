@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "pathplanning"
+version = "0.1.0"
+description = "Common used path planning algorithms with animations"
+authors = ["Dong"]
+license = "LICENSE"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+matplotlib = "3.4.3"
+numpy = "1.19.5"
+pyrr = "^0.10.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
