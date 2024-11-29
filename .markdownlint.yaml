@@ -1,0 +1,9 @@
+# 禁用特定规则
+MD013: false # 禁用每行字符数限制
+MD033: false # 允许使用内联 HTML
+
+# 配置特定规则
+MD024:
+  siblings_only: true # 仅在同级标题中禁止重复标题
+MD025:
+  front_matter_title: "" # 忽略YAML front
